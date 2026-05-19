@@ -95,6 +95,16 @@ def detectar_amb_nou_pipeline(img_bgr):
     return x, y, w, h
 
 
+def detectar_amb_harris_hog(img_bgr):
+    """Crida pipeline_harris_hog.py i retorna (x, y, w, h) o None."""
+    from pipeline_harris_hog import detectar_matricula
+    res = detectar_matricula(img_bgr)
+    if res is None:
+        return None
+    x, y, w, h, _ = res
+    return x, y, w, h
+
+
 def detectar_amb_morfo(img_bgr):
     """
     Reimplementació inline de morfo.py per poder cridar-la com a funció.
@@ -208,7 +218,7 @@ def main():
     parser = argparse.ArgumentParser(description="Avalua pipelines de detecció de matrícules")
     parser.add_argument('--dataset',  default='dataset',
                         help='Directori amb imatges i anotacions (default: dataset)')
-    parser.add_argument('--pipeline', choices=['nou', 'antic', 'tots'], default='tots',
+    parser.add_argument('--pipeline', choices=['nou', 'antic', 'tots', 'harris'], default='tots',
                         help='Quin pipeline avaluar (default: tots)')
     parser.add_argument('--verbose',  action='store_true',
                         help='Mostra detall per cada imatge')
@@ -241,18 +251,28 @@ def main():
             llindar_iou=args.iou, verbose=args.verbose
         )
 
+    if args.pipeline in ('harris', 'tots'):
+        print("\nAvaluant pipeline HARRIS+HOG...")
+        resultats['harris'] = avaluar_pipeline(
+            "Pipeline Harris+HOG+Contrast (nou)",
+            detectar_amb_harris_hog, gt,
+            llindar_iou=args.iou, verbose=args.verbose
+        )
+
     # Resum comparatiu
-    if len(resultats) == 2:
-        nou   = resultats['nou']
-        antic = resultats['antic']
+    if len(resultats) >= 2:
+        claus = list(resultats.keys())
+        base  = resultats[claus[0]]
         print("COMPARACIÓ DIRECTA")
-        print(f"{'Mètrica':<15} {'Antic':>10} {'Nou':>10} {'Millora':>10}")
-        print("-" * 47)
-        for k, label in [('precisio', 'Precisió'), ('recall', 'Recall'),
-                          ('f1', 'F1 Score'), ('iou_mig', 'IoU mitjà')]:
-            delta = nou[k] - antic[k]
-            signe = "+" if delta >= 0 else ""
-            print(f"{label:<15} {antic[k]:>10.3f} {nou[k]:>10.3f} {signe}{delta:>9.3f}")
+        header = f"{'Mètrica':<15}" + "".join(f"{k:>14}" for k in claus)
+        print(header)
+        print("-" * (15 + 14 * len(claus)))
+        for metric, label in [('precisio', 'Precisió'), ('recall', 'Recall'),
+                               ('f1', 'F1 Score'), ('iou_mig', 'IoU mitjà')]:
+            row = f"{label:<15}"
+            for k in claus:
+                row += f"{resultats[k][metric]:>14.3f}"
+            print(row)
 
 
 if __name__ == "__main__":
