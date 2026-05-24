@@ -1,14 +1,15 @@
 """
 Comprova els resultats del pipeline contra el ground truth del dataset.
-Mostra per cada imatge si la detecció és correcta i calcula l'accuracy global.
+Llegeix els bounding boxes guardats per pipeline_pas_a_pas (bbox.txt)
+i calcula accuracy, precisió, recall i F1.
 
 Ús:
-  python3 comprovar.py              # usa dataset/ i pipeline_millorat
-  python3 comprovar.py --iou 0.4   # canvia el llindar IoU (defecte: 0.5)
-  python3 comprovar.py --verbose    # mostra detall de cada cas
+  python3 check.py                        # usa dataset/ i resultats_sobel/
+  python3 check.py --resultats altra_dir  # carpeta de resultats alternativa
+  python3 check.py --iou 0.4              # canvia el llindar IoU (defecte: 0.5)
+  python3 check.py --verbose              # mostra detall de cada cas
 """
 
-import cv2
 import numpy as np
 import os
 import sys
@@ -38,16 +39,28 @@ def llegir_gt(txt_path):
     return None
 
 
+def llegir_bbox(bbox_path):
+    """Llegeix el bbox detectat pel pipeline  →  (x, y, w, h) o None."""
+    try:
+        with open(bbox_path) as f:
+            parts = f.readline().strip().split()
+        if len(parts) == 4:
+            return int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
+    except Exception:
+        pass
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', default='dataset')
+    parser.add_argument('--resultats', default='resultats_sobel',
+                        help='Carpeta amb els resultats del pipeline (defecte: resultats_sobel)')
     parser.add_argument('--iou', type=float, default=0.5,
                         help='Llindar IoU per considerar detecció correcta (defecte 0.5)')
     parser.add_argument('--verbose', action='store_true',
                         help='Mostra detall de cada imatge')
     args = parser.parse_args()
-
-    from pipeline_millorat import detectar_matricula
 
     tp = fp = fn = 0
     iou_vals = []
@@ -66,37 +79,18 @@ def main():
         if gt is None:
             continue
 
-        # Busca la imatge corresponent
-        img_path = None
-        for ext in ('.jpg', '.jpeg', '.png', '.bmp'):
-            p = os.path.join(args.dataset, base + ext)
-            if os.path.exists(p):
-                img_path = p
-                break
+        bbox_path = os.path.join(args.resultats, base, "bbox.txt")
+        det = llegir_bbox(bbox_path)
 
-        if img_path is None:
-            fn += 1
-            if args.verbose:
-                print(f"  {base}: imatge no trobada")
-            continue
-
-        img = cv2.imread(img_path)
-        if img is None:
-            fn += 1
-            continue
-
-        det = detectar_matricula(img)
-
+        iou_v = 0.0
         if det is None:
             fn += 1
-            iou_v = 0.0
             resultat = '✗ FN (sense detecció)'
             det_str = 'None'
         else:
-            dx, dy, dw, dh, _ = det
-            iou_v = iou((dx, dy, dw, dh), gt)
+            iou_v = iou(det, gt)
             iou_vals.append(iou_v)
-            det_str = f'({dx},{dy},{dw},{dh})'
+            det_str = f'({det[0]},{det[1]},{det[2]},{det[3]})'
             if iou_v >= args.iou:
                 tp += 1
                 resultat = '✓ TP'

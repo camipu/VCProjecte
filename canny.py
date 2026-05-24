@@ -1,15 +1,8 @@
 import cv2
 import numpy as np
 import os
-import easyocr
 
-# Forcem l'ús de xcb per evitar errors de visualització en sistemes Linux/Wayland
-os.environ["QT_QPA_PLATFORM"] = "xcb"
-
-def pipeline_pas_a_pas(directori_entrada="images", directori_sortida="resultats_sobel"):
-    print("Inicialitzant EasyOCR...")
-    reader = easyocr.Reader(['en']) # [cite: 127]
-
+def pipeline_pas_a_pas(directori_entrada="dataset", directori_sortida="resultats_sobel"):
     if not os.path.exists(directori_sortida):
         os.makedirs(directori_sortida)
 
@@ -70,52 +63,45 @@ def pipeline_pas_a_pas(directori_entrada="images", directori_sortida="resultats_
 
         if location is not None:
             # -----------------------------------------------------------------
-            # PAS 5: Aplicar Màscara 
+            # PAS 5: Aplicar Màscara
             # -----------------------------------------------------------------
-            mask = np.zeros(gray.shape, np.uint8) 
-            cv2.drawContours(mask, [location], 0, 255, -1) 
+            mask = np.zeros(gray.shape, np.uint8)
+            cv2.drawContours(mask, [location], 0, 255, -1)
             cv2.imwrite(os.path.join(carpeta_pas, "05_mascara_binaria.jpg"), mask)
 
             # Imatge emmascarada (Només es veu la zona de la matrícula)
-            new_image = cv2.bitwise_and(img, img, mask=mask) # 
+            new_image = cv2.bitwise_and(img, img, mask=mask)
             cv2.imwrite(os.path.join(carpeta_pas, "06_imatge_emmascarada.jpg"), new_image)
 
             # -----------------------------------------------------------------
-            # PAS 6: Retall de la ROI 
+            # PAS 6: Retall de la ROI
             # -----------------------------------------------------------------
             x_indices, y_indices = np.where(mask == 255)
-            x1, y1 = np.min(x_indices), np.min(y_indices) 
-            x2, y2 = np.max(x_indices), np.max(y_indices) 
-            cropped_image = gray[x1:x2+1, y1:y2+1] 
+            x1, y1 = np.min(x_indices), np.min(y_indices)
+            x2, y2 = np.max(x_indices), np.max(y_indices)
+            cropped_image = gray[x1:x2+1, y1:y2+1]
             cv2.imwrite(os.path.join(carpeta_pas, "07_roi_matricula_retallada.jpg"), cropped_image)
 
-            # -----------------------------------------------------------------
-            # PAS 7: Reconeixement OCR 
-            # -----------------------------------------------------------------
-            try:
-                result = reader.readtext(cropped_image) 
-                text = result[0][-2] if result else "NO LLEGIBLE" 
-                print(f" -> Text detectat: {text}")
-            except Exception as e:
-                text = "ERROR OCR"
-                print(f" -> Error a l'OCR: {e}")
+            # Guardem el bounding box detectat perquè check.py el pugui llegir
+            bx, by, bw, bh = cv2.boundingRect(location)
+            with open(os.path.join(carpeta_pas, "bbox.txt"), "w") as f:
+                f.write(f"{bx} {by} {bw} {bh}\n")
 
             # -----------------------------------------------------------------
-            # PAS 8: Render Final 
+            # PAS 7: Render Final
             # -----------------------------------------------------------------
             img_final = img.copy()
-            font = cv2.FONT_HERSHEY_SIMPLEX 
-            # Escrivim el text detectat
-            cv2.putText(img_final, text=text, org=(location[0][0][0], location[1][0][1] + 60),
-                        fontFace=font, fontScale=1, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA) 
-            # Dibuixem el rectangle verd final
-            cv2.rectangle(img_final, tuple(location[0][0]), tuple(location[2][0]), (0, 255, 0), 3) 
-            
-            cv2.imwrite(os.path.join(carpeta_pas, "08_resultat_final.jpg"), img_final)
+            cv2.rectangle(img_final, tuple(location[0][0]), tuple(location[2][0]), (0, 255, 0), 3)
+            cv2.imwrite(os.path.join(carpeta_pas, "07_resultat_final.jpg"), img_final)
         else:
             print(" -> [X] No s'ha trobat cap contorn de 4 vèrtices per a aquesta imatge.")
 
     print(f"\nProcés completat. Revisa les subcarpetes a: '{directori_sortida}/'")
 
 if __name__ == "__main__":
-    pipeline_pas_a_pas()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--entrada', default='dataset')
+    parser.add_argument('--sortida', default='resultats_sobel')
+    args = parser.parse_args()
+    pipeline_pas_a_pas(args.entrada, args.sortida)
