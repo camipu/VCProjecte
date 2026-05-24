@@ -32,35 +32,35 @@ def pipeline_pas_a_pas(directori_entrada="images", directori_sortida="resultats_
         print(f"--- Processant: {nom_arxiu} ---")
 
         # ---------------------------------------------------------------------
-        # PAS 1: Grayscale (Pàg. 1 del PDF)
+        # PAS 1: Grayscale 
         # ---------------------------------------------------------------------
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # 
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) 
         cv2.imwrite(os.path.join(carpeta_pas, "01_escala_grisos.jpg"), gray)
 
         # ---------------------------------------------------------------------
-        # PAS 2: Bilateral Filter (Pàg. 2 del PDF - Reducció de soroll)
+        # PAS 2: Bilateral Filter 
         # ---------------------------------------------------------------------
-        bfilter = cv2.bilateralFilter(gray, 11, 17, 17) # 
+        bfilter = cv2.bilateralFilter(gray, 11, 17, 17) 
         cv2.imwrite(os.path.join(carpeta_pas, "02_filtre_bilateral.jpg"), bfilter)
 
         # ---------------------------------------------------------------------
-        # PAS 3: Canny Edge Detection (Pàg. 2 del PDF)
+        # PAS 3: Canny Edge Detection 
         # ---------------------------------------------------------------------
-        edged = cv2.Canny(bfilter, 30, 200) # 
+        edged = cv2.Canny(bfilter, 30, 200) 
         cv2.imwrite(os.path.join(carpeta_pas, "03_vores_canny.jpg"), edged)
 
         # ---------------------------------------------------------------------
-        # PAS 4: Find Contours & Selection (Pàg. 2 del PDF)
+        # PAS 4: Find Contours & Selection 
         # ---------------------------------------------------------------------
         keypoints = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE) # [cite: 60]
         contours = keypoints[0] if len(keypoints) == 2 else keypoints[1]
-        contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10] # 
+        contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10] 
 
         location = None
         for contour in contours:
-            approx = cv2.approxPolyDP(contour, 10, True) # [cite: 65]
-            if len(approx) == 4: # [cite: 66]
-                location = approx # [cite: 67]
+            approx = cv2.approxPolyDP(contour, 10, True) 
+            if len(approx) == 4: 
+                location = approx 
                 break
 
         # Imatge de diagnòstic per veure TOTS els 10 contorns candidats en vermell
@@ -70,10 +70,10 @@ def pipeline_pas_a_pas(directori_entrada="images", directori_sortida="resultats_
 
         if location is not None:
             # -----------------------------------------------------------------
-            # PAS 5: Aplicar Màscara (Pàg. 3 del PDF)
+            # PAS 5: Aplicar Màscara 
             # -----------------------------------------------------------------
-            mask = np.zeros(gray.shape, np.uint8) # [cite: 83]
-            cv2.drawContours(mask, [location], 0, 255, -1) # 
+            mask = np.zeros(gray.shape, np.uint8) 
+            cv2.drawContours(mask, [location], 0, 255, -1) 
             cv2.imwrite(os.path.join(carpeta_pas, "05_mascara_binaria.jpg"), mask)
 
             # Imatge emmascarada (Només es veu la zona de la matrícula)
@@ -81,35 +81,35 @@ def pipeline_pas_a_pas(directori_entrada="images", directori_sortida="resultats_
             cv2.imwrite(os.path.join(carpeta_pas, "06_imatge_emmascarada.jpg"), new_image)
 
             # -----------------------------------------------------------------
-            # PAS 6: Retall de la ROI (Pàg. 3 i 4 del PDF)
+            # PAS 6: Retall de la ROI 
             # -----------------------------------------------------------------
-            x_indices, y_indices = np.where(mask == 255) # [cite: 105]
-            x1, y1 = np.min(x_indices), np.min(y_indices) # [cite: 105]
-            x2, y2 = np.max(x_indices), np.max(y_indices) # [cite: 106]
-            cropped_image = gray[x1:x2+1, y1:y2+1] # [cite: 106]
+            x_indices, y_indices = np.where(mask == 255)
+            x1, y1 = np.min(x_indices), np.min(y_indices) 
+            x2, y2 = np.max(x_indices), np.max(y_indices) 
+            cropped_image = gray[x1:x2+1, y1:y2+1] 
             cv2.imwrite(os.path.join(carpeta_pas, "07_roi_matricula_retallada.jpg"), cropped_image)
 
             # -----------------------------------------------------------------
-            # PAS 7: Reconeixement OCR (Pàg. 4 del PDF)
+            # PAS 7: Reconeixement OCR 
             # -----------------------------------------------------------------
             try:
-                result = reader.readtext(cropped_image) # [cite: 127]
-                text = result[0][-2] if result else "NO LLEGIBLE" # [cite: 135]
+                result = reader.readtext(cropped_image) 
+                text = result[0][-2] if result else "NO LLEGIBLE" 
                 print(f" -> Text detectat: {text}")
             except Exception as e:
                 text = "ERROR OCR"
                 print(f" -> Error a l'OCR: {e}")
 
             # -----------------------------------------------------------------
-            # PAS 8: Render Final (Pàg. 5 del PDF)
+            # PAS 8: Render Final 
             # -----------------------------------------------------------------
             img_final = img.copy()
-            font = cv2.FONT_HERSHEY_SIMPLEX # [cite: 137]
+            font = cv2.FONT_HERSHEY_SIMPLEX 
             # Escrivim el text detectat
             cv2.putText(img_final, text=text, org=(location[0][0][0], location[1][0][1] + 60),
-                        fontFace=font, fontScale=1, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA) # [cite: 138]
+                        fontFace=font, fontScale=1, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA) 
             # Dibuixem el rectangle verd final
-            cv2.rectangle(img_final, tuple(location[0][0]), tuple(location[2][0]), (0, 255, 0), 3) # [cite: 139]
+            cv2.rectangle(img_final, tuple(location[0][0]), tuple(location[2][0]), (0, 255, 0), 3) 
             
             cv2.imwrite(os.path.join(carpeta_pas, "08_resultat_final.jpg"), img_final)
         else:
