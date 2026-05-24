@@ -4,7 +4,7 @@ Llegeix els bounding boxes guardats per pipeline_pas_a_pas (bbox.txt)
 i calcula accuracy, precisió, recall i F1.
 
 Ús:
-  python3 check.py                        # usa dataset/ i resultats_sobel/
+  python3 check.py                        # usa dataset/ i resultats/
   python3 check.py --resultats altra_dir  # carpeta de resultats alternativa
   python3 check.py --iou 0.4              # canvia el llindar IoU (defecte: 0.5)
   python3 check.py --verbose              # mostra detall de cada cas
@@ -54,8 +54,8 @@ def llegir_bbox(bbox_path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', default='dataset')
-    parser.add_argument('--resultats', default='resultats_sobel',
-                        help='Carpeta amb els resultats del pipeline (defecte: resultats_sobel)')
+    parser.add_argument('--resultats', default='resultats',
+                        help='Carpeta amb els resultats del pipeline (defecte: resultats)')
     parser.add_argument('--iou', type=float, default=0.5,
                         help='Llindar IoU per considerar detecció correcta (defecte 0.5)')
     parser.add_argument('--verbose', action='store_true',

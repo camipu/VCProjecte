@@ -50,11 +50,20 @@ def pipeline_pas_a_pas(directori_entrada="dataset", directori_sortida="resultats
         contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10] 
 
         location = None
+        img_area = img.shape[0] * img.shape[1]
         for contour in contours:
-            approx = cv2.approxPolyDP(contour, 10, True) 
-            if len(approx) == 4: 
-                location = approx 
-                break
+            approx = cv2.approxPolyDP(contour, 10, True)
+            if len(approx) != 4:
+                continue
+            x, y, w, h = cv2.boundingRect(approx)
+            ratio = w / h
+            area = w * h
+            if ratio < 2.0 or ratio > 6.0:
+                continue
+            if area < 1500 or area > 0.2 * img_area:
+                continue
+            location = approx
+            break
 
         # Imatge de diagnòstic per veure TOTS els 10 contorns candidats en vermell
         img_contorns = img.copy()
@@ -102,6 +111,6 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--entrada', default='dataset')
-    parser.add_argument('--sortida', default='resultats_sobel')
+    parser.add_argument('--sortida', default='resultats')
     args = parser.parse_args()
     pipeline_pas_a_pas(args.entrada, args.sortida)
