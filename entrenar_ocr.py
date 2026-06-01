@@ -2,11 +2,36 @@ import cv2
 import numpy as np
 import os
 
-# Configuración de rutas según tu estructura actual
 DATASET_LETRAS = "LetrasGeneradas"  
 MODELO_SALIDA = "modelo_knn.xml"
 MAPEO_SALIDA = "mapeo_clases.txt"
-IMG_WIDTH, IMG_HEIGHT = 20, 30    # Tamaño homogéneo estándar para el OCR
+IMG_WIDTH, IMG_HEIGHT = 20, 30    
+
+def extraer_caracteristicas_avanzadas(img_bin, aspect_ratio=1.0):
+    """
+    Extrae un descriptor robusto combinando la imagen con características 
+    geométricas que diferencian letras conflictivas como la 'A' y el '4'.
+    """
+    # 1. Base del descriptor: los píxeles planos
+    pixeles_planos = img_bin.flatten() / 255.0  # Normalizado entre 0 y 1
+    
+    # 2. Proyecciones horizontales y verticales (Suma de píxeles por filas y columnas)
+    # Esto ayuda a detectar dónde se concentra la masa (el '4' suele tener más peso abajo a la derecha)
+    proj_horiz = np.sum(img_bin, axis=1) / (255.0 * IMG_WIDTH)
+    proj_vert = np.sum(img_bin, axis=0) / (255.0 * IMG_HEIGHT)
+    
+    # 3. Dividir la imagen en 4 cuadrantes y calcular la densidad de cada uno
+    h_mitad, w_mitad = IMG_HEIGHT // 2, IMG_WIDTH // 2
+    c1 = np.sum(img_bin[0:h_mitad, 0:w_mitad])
+    c2 = np.sum(img_bin[0:h_mitad, w_mitad:IMG_WIDTH])
+    c3 = np.sum(img_bin[h_mitad:IMG_HEIGHT, 0:w_mitad])
+    c4 = np.sum(img_bin[h_mitad:IMG_HEIGHT, w_mitad:IMG_WIDTH])
+    total_pixeles = np.sum(img_bin) if np.sum(img_bin) > 0 else 1.0
+    densidades = np.array([c1, c2, c3, c4]) / total_pixeles
+    
+    # 4. Concatenar todo en un único vector de características súper robusto
+    descriptor = np.concatenate([pixeles_planos, proj_horiz, proj_vert, densidades, [aspect_ratio]])
+    return descriptor.astype(np.float32)
 
 def cargar_y_entrenar():
     if not os.path.exists(DATASET_LETRAS):
@@ -23,10 +48,13 @@ def cargar_y_entrenar():
         for clase, idx in mapeo_clases.items():
             f.write(f"{clase}:{idx}\n")
 
-    print(f"Leyendo y adaptando caracteres desde '{DATASET_LETRAS}'...")
+    print(f"Leyendo y extrayendo descriptores estructurales desde '{DATASET_LETRAS}'...")
+    cont_antiguas = 0
+    cont_nuevas = 0
+
     for clase in clases:
         carpeta_clase = os.path.join(DATASET_LETRAS, clase)
-        imagenes = [f for f in os.listdir(carpeta_clase) if f.lower().endswith(('.tif', '.png', '.jpg'))]
+        imagenes = [f for f in os.listdir(carpeta_clase) if f.lower().endswith(('.tif', '.tiff', '.png', '.jpg', '.jpeg'))]
         
         idx_etiqueta = mapeo_clases[clase]
         
@@ -36,16 +64,24 @@ def cargar_y_entrenar():
             if img is None:
                 continue
             
-            # 1. Redimensionar al tamaño del pipeline
+            # Calcular relación de aspecto antes de redimensionar (Ancho / Alto)
+            h_orig, w_orig = img.shape[:2]
+            aspect_ratio = float(w_orig) / float(h_orig) if h_orig > 0 else 1.0
+            
+            # Redimensionar y binarizar
             img_res = cv2.resize(img, (IMG_WIDTH, IMG_HEIGHT))
+            _, img_bin = cv2.threshold(img_res, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
             
-            # 2. ¡EL CAMBIO CLAVE!: Forzar binarización INVERTIDA (THRESH_BINARY_INV)
-            # Esto hace que las letras del dataset pasen a ser BLANCAS sobre fondo NEGRO,
-            # calcando el comportamiento de 'thresh' en segment_cc.py
-            _, img_bin = cv2.threshold(img_res, 127, 255, cv2.THRESH_BINARY_INV)
+            # Corrección inteligente de fondo
+            borde_superior = img_bin[0, :]
+            if np.sum(borde_superior == 255) > (IMG_WIDTH / 2):
+                img_bin = cv2.bitwise_not(img_bin)
+                cont_antiguas += 1
+            else:
+                cont_nuevas += 1
             
-            # 3. Convertir a vector plano
-            descriptor = img_bin.flatten()
+            # EXTRAER DESCRIPTOR COMPUESTO
+            descriptor = extraer_caracteristicas_avanzadas(img_bin, aspect_ratio)
             
             X_train.append(descriptor)
             y_train.append(idx_etiqueta)
@@ -53,16 +89,16 @@ def cargar_y_entrenar():
     X_train = np.array(X_train, dtype=np.float32)
     y_train = np.array(y_train, dtype=np.int32)
     
-    print(f"Dataset cargado y emparejado. Total de muestras: {len(X_train)}")
+    print(f"\n[INFO] Dataset estructurado:")
+    print(f"       - Total de muestras cargadas: {len(X_train)}")
+    print(f"       - Tamaño del nuevo descriptor por letra: {X_train.shape[1]} características")
     
-    # 4. Entrenar el clasificador KNN
-    print("Re-entrenando clasificador KNN de OpenCV...")
+    print("\nEntrenando clasificador KNN con descriptores geométricos...")
     knn = cv2.ml.KNearest_create()
     knn.train(X_train, cv2.ml.ROW_SAMPLE, y_train)
     
-    # Guardar modelo mejorado
     knn.save(MODELO_SALIDA)
-    print(f"¡Éxito! Modelo adaptado guardado en '{MODELO_SALIDA}'.")
+    print(f"¡Éxito! Modelo avanzado guardado en '{MODELO_SALIDA}'.")
 
 if __name__ == "__main__":
     cargar_y_entrenar()

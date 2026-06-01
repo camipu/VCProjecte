@@ -63,11 +63,12 @@ def segmentar_y_reconocer_components(roi, knn_model, mapeo_dic, min_area=50):
 
     # 5. PASAR EL OCR A CADA DÍGITO DETECTADO
     for i, (x, y, w, h, area) in enumerate(components):
-        # Aislar el recorte del carácter individual original
         caracter_recortado = thresh[y:y+h, x:x+w]
         
-        # --- ¡MEJORA CLAVE!: Añadir un margen negro (Padding) de 2 píxeles ---
-        # Esto centra la letra y evita que toque los bordes, emulando el dataset de entrenamiento
+        # Calcular relación de aspecto real de la matrícula antes del resize
+        aspect_ratio = float(w) / float(h) if h > 0 else 1.0
+        
+        # Padding de seguridad
         caracter_recortado = cv2.copyMakeBorder(
             caracter_recortado, 
             top=2, bottom=2, left=2, right=2, 
@@ -75,20 +76,33 @@ def segmentar_y_reconocer_components(roi, knn_model, mapeo_dic, min_area=50):
             value=0
         )
         
-        # Adecuar el carácter al tamaño con el que se entrenó el clasificador (20x30)
         caracter_res = cv2.resize(caracter_recortado, (IMG_WIDTH, IMG_HEIGHT))
         
-        # Aplanar los píxeles a un vector fila de tipo flotante
-        muestra = caracter_res.flatten().astype(np.float32).reshape(1, -1)
+        # --- AQUÍ USAMOS EL NUEVO DESCRIPTOR ROBUSTO ---
+        # Volvemos a calcular los cuadrantes y proyecciones para este carácter concreto
+        pixeles_planos = caracter_res.flatten() / 255.0
+        proj_horiz = np.sum(caracter_res, axis=1) / (255.0 * IMG_WIDTH)
+        proj_vert = np.sum(caracter_res, axis=0) / (255.0 * IMG_HEIGHT)
+        
+        h_mitad, w_mitad = IMG_HEIGHT // 2, IMG_WIDTH // 2
+        c1 = np.sum(caracter_res[0:h_mitad, 0:w_mitad])
+        c2 = np.sum(caracter_res[0:h_mitad, w_mitad:IMG_WIDTH])
+        c3 = np.sum(caracter_res[h_mitad:IMG_HEIGHT, 0:w_mitad])
+        c4 = np.sum(caracter_res[h_mitad:IMG_HEIGHT, w_mitad:IMG_WIDTH])
+        total_p = np.sum(caracter_res) if np.sum(caracter_res) > 0 else 1.0
+        densidades = np.array([c1, c2, c3, c4]) / total_p
+        
+        # Generar vector muestra idéntico al entrenamiento
+        muestra = np.concatenate([pixeles_planos, proj_horiz, proj_vert, densidades, [aspect_ratio]])
+        muestra = muestra.astype(np.float32).reshape(1, -1)
         
         # Predicción KNN buscando los 3 vecinos más próximos
         _, resultado, _, _ = knn_model.findNearest(muestra, k=3)
         letra_predicha = mapeo_dic[int(resultado[0][0])]
         
-        # Ir acumulando las letras para construir el string final
         texto_matricula += letra_predicha
 
-        # Dibujar los diagnósticos visuales en el lienzo de salida (out_visual)
+        # Dibujar resultados
         cv2.rectangle(out_visual, (x, y), (x + w, y + h), (0, 255, 0), 1)
         cv2.putText(out_visual, letra_predicha, (x + 2, y + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
