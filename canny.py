@@ -31,7 +31,7 @@ def pipeline_pas_a_pas(directori_entrada="dataset", directori_sortida="resultats
         cv2.imwrite(os.path.join(carpeta_pas, "01_escala_grisos.jpg"), gray)
 
         # ---------------------------------------------------------------------
-        # PAS 2: Bilateral Filter 
+        # PAS 2: Difuminació 
         # ---------------------------------------------------------------------
         bfilter = cv2.bilateralFilter(gray, 11, 17, 17) 
         cv2.imwrite(os.path.join(carpeta_pas, "02_filtre_bilateral.jpg"), bfilter)
@@ -45,9 +45,9 @@ def pipeline_pas_a_pas(directori_entrada="dataset", directori_sortida="resultats
         # ---------------------------------------------------------------------
         # PAS 4: Find Contours & Selection 
         # ---------------------------------------------------------------------
-        keypoints = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE) # [cite: 60]
+        keypoints = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         contours = keypoints[0] if len(keypoints) == 2 else keypoints[1]
-        contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10] 
+        contours = sorted(contours, key=cv2.contourArea, reverse=True)[:25] 
 
         location = None
         img_area = img.shape[0] * img.shape[1]
