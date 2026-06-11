@@ -14,8 +14,7 @@ Aquest repositori conté el codi font i els recursos d'un sistema modular de Rec
 * **check_ocr.py** / **check.py**: Utilitats d'avaluació que mesuren el rendiment global del pipeline de l'OCR comparant-lo amb el ground truth i check.py de la primera fase de detecció de canny.
 
 ### Carpetes i dependències
-* **resultats/**: Carpeta destinada a emmagatzemar els retalls de les matrícules i els renders amb el rectangle verd de comprovació.
-* **resultats_ocr/**: Carpeta destinada a emmagatzemar els resultats de la etapa de segmentació+ocr.
+* **LetrasGeneradas**: Dataset original (link del projecte a la memòria) de les lletres per al OCR.
 * **requirements.txt**: Fitxer amb les llibreries i dependències necessàries (OpenCV, NumPy...) per a l'execució del projecte.
 
 ## 2. Flux d'execució
