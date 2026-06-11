@@ -22,24 +22,31 @@ Aquest repositori conté el codi font i els recursos d'un sistema modular de Rec
 
 ```bash
 # 1. Instal·lar les dependències del projecte
+
 pip install -r requirements.txt
 
-# 2. Executar la detecció i localització de la placa (Fase 1)
+# 2. Executar la detecció i localització de la placa (Fase 1). Carpeta: resultats/
+
 python canny.py
 
 # 3. Evaluar el canny
+
 python check.py
 
-# 4. Generar sintèticament les lletres mancants (vocals i Q). Carpeta generada: LletresGeneradas
+# 4. Generar sintèticament les lletres mancants (vocals i Q). Carpeta: LetrasGeneradas
+
 python generador_vocals.py
 
 # 5. Extreure caràcters reals de matrícules per complementar el dataset
+
 python extraer_chars_dataset.py
 
 # 6. Entrenar el model KNN i generar el fitxer 'modelo_knn.xml'
+
 python entrenar_ocr.py
 
-# 7. Executar la segmentació i el reconeixement de caràcters (Fases 2 i 3)
+# 7. Executar la segmentació i el reconeixement de caràcters (Fases 2 i 3). Carpeta: resutlats_ocr/
+
 python segment_cc.py
 
 # 8. Avaluar el rendiment i calcular les mètriques d'accuracy globals del sistema
