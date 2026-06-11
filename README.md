@@ -29,6 +29,9 @@ pip install -r requirements.txt
 
 python canny.py
 
+per a un altre dataset d'imatges pots posar-li quina carpeta vols que agafi amb: 
+python canny.py --entrada NOM_CARPETA
+
 # 3. Evaluar el canny
 
 python check.py
